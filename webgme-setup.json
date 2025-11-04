@@ -1,4 +1,13 @@
 {
-  "components": {},
-  "dependencies": {}
+  "components": {
+    "plugins": {
+      "jsplugin": {
+        "src": "src/plugins/jsplugin",
+        "test": "test/plugins/jsplugin"
+      }
+    }
+  },
+  "dependencies": {
+    "plugins": {}
+  }
 }
