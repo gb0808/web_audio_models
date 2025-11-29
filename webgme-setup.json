@@ -4,6 +4,10 @@
       "jsplugin": {
         "src": "src/plugins/jsplugin",
         "test": "test/plugins/jsplugin"
+      },
+      "PlayAudio": {
+        "src": "src/plugins/PlayAudio",
+        "test": "test/plugins/PlayAudio"
       }
     }
   },
