@@ -1,9 +1,9 @@
 {
   "components": {
     "plugins": {
-      "jsplugin": {
-        "src": "src/plugins/jsplugin",
-        "test": "test/plugins/jsplugin"
+      "GenerateWebAudioGraph": {
+        "src": "src/plugins/GenerateWebAudioGraph",
+        "test": "test/plugins/GenerateWebAudioGraph"
       },
       "PlayAudio": {
         "src": "src/plugins/PlayAudio",

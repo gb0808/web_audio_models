@@ -1,6 +1,6 @@
 {
-  "id": "jsplugin",
-  "name": "jsplugin",
+  "id": "audioGraphToJson",
+  "name": "audioGraphToJson",
   "version": "0.1.0",
   "description": "",
   "icon": {

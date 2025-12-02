@@ -11,7 +11,7 @@
   "disableBrowserSideExecution": true,
   "dependencies": [
     {
-      "id": "jsplugin",
+      "id": "audioGraphToJson",
       "propagateConfig": true
     }
   ],

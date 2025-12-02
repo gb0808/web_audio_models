@@ -10,32 +10,17 @@ define([], function () {
         var nodes = descriptor.nodes;
         var connections = descriptor.connections;
         var nodePaths = Object.keys(nodes);
-        var nameMap = {};
-        var needsWaveShaperCurve = false;
-        var counter = 1;
-
-        // TODO: Add support for other node types
-        nodePaths.forEach(function (path) {
-            var type = nodes[path] && nodes[path].type;
-            if (type === 'MediaElementSourceNode') {
-                nameMap[path] = 'mediaSource';
-            } else if (type === 'AudioDestinationNode') {
-                nameMap[path] = 'analyser';
-            } else {
-                nameMap[path] = 'node' + counter;
-                counter += 1;
-            }
-
-            if (type === 'WaveShaperNode') {
-                needsWaveShaperCurve = true;
-            }
+        var needsWaveShaperCurve = nodePaths.some(function (path) {
+            return nodes[path] && nodes[path].type === 'WaveShaperNode';
         });
+        var nameMap = {};
+        var counter = 1;
 
         var lines = [];
 
         lines.push('// Auto-generated Web Audio boilerplate from descriptor');
         lines.push('const audioCtx = new window.AudioContext();');
-        lines.push('const audioElement = new Audio(<AudioURLHere>);');
+        lines.push('const audioElement = new Audio(<AUDIO_ASSET_URL>);');
         lines.push('const mediaSource = audioCtx.createMediaElementSource(audioElement);');
         lines.push('const analyser = audioCtx.createAnalyser();');
 
@@ -54,43 +39,42 @@ define([], function () {
         }
 
         lines.push('');
-        lines.push('const nodes = {};');
         lines.push('const connect = (from, to) => { if (from && to && from.connect) { from.connect(to); } };');
         lines.push('');
         nodePaths.forEach(function (path) {
             var node = nodes[path] || {};
             var type = node.type;
             var attrs = node.attrs || {};
-            var name = nameMap[path];
+            var name = 'node' + counter;
+            nameMap[path] = name;
+            counter += 1;
 
             if (type === 'MediaElementSourceNode') {
-                lines.push('nodes[' + JSON.stringify(path) + '] = mediaSource;');
+                lines.push('const ' + name + ' = mediaSource; // MediaElementSourceNode');
                 return;
             }
 
             if (type === 'AudioDestinationNode') {
-                lines.push('nodes[' + JSON.stringify(path) + '] = analyser;');
+                lines.push('const ' + name + ' = analyser; // AudioDestinationNode');
                 return;
             }
 
             if (type === 'GainNode') {
-                lines.push('const ' + name + ' = audioCtx.createGain(); // ' + path + ' GainNode');
+                lines.push('const ' + name + ' = audioCtx.createGain(); // GainNode');
                 if (attrs.gain !== undefined) {
                     lines.push(name + '.gain.value = ' + JSON.stringify(attrs.gain) + ';');
                 }
-                lines.push('nodes[' + JSON.stringify(path) + '] = ' + name + ';');
                 return;
             }
 
             if (type === 'WaveShaperNode') {
-                lines.push('const ' + name + ' = audioCtx.createWaveShaper(); // ' + path + ' WaveShaperNode');
+                lines.push('const ' + name + ' = audioCtx.createWaveShaper(); // WaveShaperNode');
                 if (attrs.amount !== undefined) {
                     lines.push(name + '.curve = createWaveShaperCurve(' + JSON.stringify(attrs.amount) + ');');
                 }
                 if (attrs.oversample) {
                     lines.push(name + '.oversample = ' + JSON.stringify(attrs.oversample) + ';');
                 }
-                lines.push('nodes[' + JSON.stringify(path) + '] = ' + name + ';');
                 return;
             }
         });
@@ -98,7 +82,9 @@ define([], function () {
         lines.push('');
         lines.push('// Wire up graph');
         connections.forEach(function (conn) {
-            lines.push('connect(' + nameMap[conn.src] + ', ' + nameMap[conn.dst] + ');');
+            var srcRef = nameMap[conn.src] || 'mediaSource';
+            var dstRef = nameMap[conn.dst] || 'analyser';
+            lines.push('connect(' + srcRef + ', ' + dstRef + ');');
         });
         lines.push('connect(analyser, audioCtx.destination);');
         lines.push('audioElement.play();');

@@ -58,10 +58,10 @@ define([
         const logger = this.logger;
         const activeNode = self.activeNode;
 
-        self.invokePlugin('jsplugin')
+        self.invokePlugin('audioGraphToJson')
             .then((result) => {
                 if (result.getSuccess() !== true) {
-                    throw new Error('jsplugin did not return');
+                    throw new Error('audioGraphToJson did not return');
                 }
 
                 const moFileHash = result.getArtifacts()[0];
