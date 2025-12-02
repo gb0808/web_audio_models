@@ -4,11 +4,13 @@ define([
     'js/PanelBase/PanelBaseWithHeader',
     'js/PanelManager/IActivePanel',
     'blob/BlobClient',
+    './AudioCodeUtils',
     'css!./AudioPlayerPanel.css'
 ], function (
     PanelBaseWithHeader,
     IActivePanel,
-    BlobClient
+    BlobClient,
+    AudioCodeUtils
 ) {
     'use strict';
 
@@ -22,6 +24,12 @@ define([
 
         PanelBaseWithHeader.apply(this, [options, 'Audio Player']);
         IActivePanel.call(this, layoutManager, params);
+
+        params = params || {};
+        this._client = params.client;
+        this._activeNodeId = (typeof WebGMEGlobal !== 'undefined' && WebGMEGlobal.State && WebGMEGlobal.State.getActiveObject())
+            || params.activeNode
+            || null;
 
         this.bc = new BlobClient({logger: this.logger});
         this.currentDescriptor = null;
@@ -55,16 +63,26 @@ define([
             '  <span class="status"></span>',
             '</div>',
             '<div class="descriptor-loader">',
-            '  <input type="text" class="descriptor-hash form-control" placeholder="graphDescriptorHash (registry/hash)" />',
+            '  <select class="descriptor-select form-control">',
+            '    <option value="">Select an AudioGraph descriptor</option>',
+            '  </select>',
             '  <button class="btn btn-default btn-load-descriptor">Load Descriptor</button>',
             '</div>',
-            '<canvas class="waveform" height="180"></canvas>'
+            '<canvas class="waveform" height="180"></canvas>',
+            '<div class="code-section">',
+            '  <div class="code-header">',
+            '    <span>Generated Web Audio code</span>',
+            '    <button class="btn btn-xs btn-default btn-copy-code" type="button">Copy</button>',
+            '  </div>',
+            '  <pre class="code-block"><code class="code-content">// Load a descriptor to see the generated graph code.</code></pre>',
+            '</div>'
         ].join(''));
 
         this.canvas = body.find('.waveform')[0];
         this.ctx2d = this.canvas.getContext('2d');
         this.statusEl = body.find('.status');
-        this.status('Load a descriptor hash or pick a local audio file to begin.');
+        this.codeContentEl = body.find('.code-content')[0];
+        this.status('Select an AudioGraph descriptor or pick a local audio file to begin.');
 
         this.$el.on('click', '.btn-play', function () {
             self.play();
@@ -73,19 +91,15 @@ define([
             self.pause();
         });
         this.$el.on('click', '.btn-load-descriptor', function () {
-            var hash = body.find('.descriptor-hash').val();
-            if (hash) {
-                var cleanedHash = hash && hash.trim ? hash.trim() : hash;
-                self.status('Loading descriptor ' + cleanedHash + ' ...');
-                self.bc.getObjectAsJSON(cleanedHash)
-                    .then(function (descriptor) {
-                        self.onDescriptorLoaded(descriptor, 'Descriptor loaded manually');
-                    })
-                    .catch(function (err) {
-                        var msg = err && err.message ? err.message : err;
-                        self.status('Failed to load descriptor: ' + msg);
-                    });
+            var hash = body.find('.descriptor-select').val();
+            if (!hash) {
+                return;
             }
+            self.status('Loading descriptor ' + hash + ' ...');
+            self.bc.getObjectAsJSON(hash)
+                .then(function (descriptor) {
+                    self.onDescriptorLoaded(descriptor, 'Descriptor loaded');
+                });
         });
         this.$el.on('change', '.audio-input', function (event) {
             var file = event.target.files && event.target.files[0];
@@ -101,10 +115,54 @@ define([
             self.status('Loaded local file: ' + file.name);
             self.buildGraph(url);
         });
+        this.$el.on('click', '.btn-copy-code', function () {
+            self.copyCode();
+        });
+        this.populateDescriptorDropdown();
+
+        if (typeof WebGMEGlobal !== 'undefined' && WebGMEGlobal.State && WebGMEGlobal.State.on) {
+            var selfPanel = this;
+            WebGMEGlobal.State.on('change:activeObject', function (_m, nodeId) {
+                selfPanel._activeNodeId = nodeId;
+                selfPanel.populateDescriptorDropdown();
+            });
+        }
+    };
+
+    // Walks the AudioStudio and pulls all AudioGraph descriptors hashes for dropdown
+    AudioPlayerPanel.prototype.populateDescriptorDropdown = function () {
+        var selector = this.$el.find('.descriptor-select');
+        selector.empty();
+        selector.append('<option value="">Select an AudioGraph descriptor</option>');
+
+        var client = this._client;
+        var activeNodeId = this._activeNodeId || (typeof WebGMEGlobal !== 'undefined' && WebGMEGlobal.State && WebGMEGlobal.State.getActiveObject());
+        this._activeNodeId = activeNodeId;
+        var activeNode = client && activeNodeId && client.getNode(activeNodeId);
+
+        // Walk only AudioGraph children and add hashes to dropdown
+        var childIds = activeNode.getChildrenIds() || [];
+        childIds.forEach(function (childId) {
+            var child = client.getNode(childId);
+            var metaNode = child && client.getNode(child.getMetaTypeId && child.getMetaTypeId());
+            var metaName = metaNode && metaNode.getAttribute && metaNode.getAttribute('name');
+
+            if (metaName === 'AudioGraph') {
+                var hash = child.getAttribute('graphDescriptorFileHash');
+
+                if (hash) {
+                    var name = child.getAttribute('name') || childId;
+                    selector.append('<option value="' + hash + '">' + name + '</option>');
+                }
+            }
+        });
+
+        var optionCount = selector.find('option').length - 1; // ignore placeholder
+        this.status(optionCount ? ('Found ' + optionCount + ' AudioGraph descriptors') : 'No AudioGraph descriptors found');
     };
 
     // Handle descriptor once fetched.
-    AudioPlayerPanel.prototype.onDescriptorLoaded = function (descriptor, prefix) {
+    AudioPlayerPanel.prototype.onDescriptorLoaded = function (descriptor) {
         this.currentDescriptor = descriptor;
         this.status('Descriptor loaded');
         var self = this;
@@ -112,13 +170,9 @@ define([
         var urlToUse = this.localFileUrl;
 
         if (!urlToUse && resolvedAudioHash) {
-            try {
-                urlToUse = this.bc.getDownloadURL(resolvedAudioHash);
-            } catch (e) {
-                this.status('Failed to resolve audio blob: ' + e);
-                return;
-            }
+            urlToUse = this.bc.getDownloadURL(resolvedAudioHash);
         }
+        this.renderGraphCode(descriptor, urlToUse);
         if (urlToUse) {
             self.buildGraph(urlToUse);
         } else {
@@ -129,19 +183,21 @@ define([
     // TODO Add missing audio node types
     // Build Web Audio graph from descriptor or fallback.
     AudioPlayerPanel.prototype.buildGraph = function (audioUrl) {
+        var descriptor = this.currentDescriptor;
+        this.renderGraphCode(descriptor, audioUrl);
+
         if (!audioUrl) {
             this.status('No audio source loaded.');
             return;
         }
 
-        var descriptor = this.currentDescriptor;
         var self = this;
         this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         this.audioAsset = new Audio();
         this.audioAsset.src = audioUrl;
         this.mediaSource = this.audioCtx.createMediaElementSource(this.audioAsset);
         this.analyser = this.audioCtx.createAnalyser();
-        this.nodes = {};
+        this.audioNodes = {};
         this.userPaused = true;
 
         // Just play the original audio if no descriptor
@@ -153,9 +209,11 @@ define([
             return;
         }
 
+        var descriptorNodes = descriptor.nodes || {};
+
         // Walk through descriptor and create Web Audio nodes
-        Object.keys(descriptor.nodes).forEach(function (path) {
-            var node = descriptor.nodes[path];
+        Object.keys(descriptorNodes).forEach(function (path) {
+            var node = descriptorNodes[path];
             var type = node.type;
             var attrs = node.attrs || {};
 
@@ -181,7 +239,7 @@ define([
         });
 
         // Connect graph using descriptor connections
-        descriptor.connections.forEach(function (c) {
+        (descriptor.connections || []).forEach(function (c) {
             var srcNode = self.audioNodes[c.src] || self.mediaSource;
             var dstNode = self.audioNodes[c.dst] || self.analyser;
             srcNode.connect(dstNode);
@@ -190,6 +248,14 @@ define([
         this.analyser.connect(this.audioCtx.destination);
         this.status('Audio graph created. Press play.');
         this.drawWaveform();
+    };
+
+    AudioPlayerPanel.prototype.renderGraphCode = function (descriptor, audioUrl) {
+        if (!this.codeContentEl) {
+            return;
+        }
+        var code = AudioCodeUtils.generateGraphBoilerplate(descriptor, audioUrl);
+        this.codeContentEl.textContent = code;
     };
 
     // Audio waveform rendering
@@ -239,6 +305,13 @@ define([
             }
         }
         return curve;
+    };
+
+    AudioPlayerPanel.prototype.copyCode = function () {
+        if (!this.codeContentEl) {
+            return;
+        }
+        AudioCodeUtils.copyCode(this.codeContentEl, this.status.bind(this));
     };
 
     // Play button controls

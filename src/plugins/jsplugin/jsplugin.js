@@ -32,7 +32,6 @@ define([
     }
 
     audioGraphToJson.metadata = pluginMetadata;
-
     audioGraphToJson.prototype = Object.create(PluginBase.prototype);
     audioGraphToJson.prototype.constructor = audioGraphToJson;
 
@@ -51,8 +50,7 @@ define([
         var blobClient = self.blobClient;
 
         var ignoredAttrs = {
-            name: true,
-            audioAsset: true // TODO maybe we want to include this? need to implement visualizer side first
+            name: true
         };
 
     
@@ -62,9 +60,7 @@ define([
             var attrNames = meta ? core.getAttributeNames(meta) || [] : [];
 
             // filter out non web audio relevant attributes
-            attrNames = attrNames.filter(function (attr) {
-                return !ignoredAttrs[attr];
-            });
+            attrNames = attrNames.filter(attr => !ignoredAttrs[attr]);
 
             var attrs = {};
             attrNames.forEach(name => {
@@ -78,11 +74,10 @@ define([
         }
 
         // Generates a descriptor of the audioGraph that the visualizer can use to build the webaudio graph
-        function generateGraph(root) {
-            return core.loadChildren(root).then(function (children) {
+        function generateGraph(audioGraphNode) {
+            return core.loadChildren(audioGraphNode).then(children => {
                 var nodes = {};
                 var connections = [];
-                var audioHash = null;
 
                 children.forEach(child => {
                     var meta = core.getMetaType(child);
@@ -103,22 +98,11 @@ define([
                         name: core.getAttribute(child, 'name'),
                         attrs: getAttributes(child)
                     };
-
-                    // TODO: not sure if we add audio asset per node or just once in the graph
-
-                    // var assetHash = core.getAttribute(child, 'audioAsset');
-                    // if (assetHash) {
-                    //     nodes[path].audio = assetHash;
-                    //     if (!audioHash) {
-                    //         audioHash = assetHash;
-                    //     }
-                    // }
                 });
 
                 return {
                     nodes: nodes,
                     connections: connections,
-                    audioHash: audioHash
                 };
             });
         }
@@ -134,11 +118,9 @@ define([
                         return artifact.save();
                     });
             })
-            // TODO probably a better way to handle descriptors 
-            // Add descriptor hash as attribute
+            // Add descriptor hash as attribute (used by visualizer to load descriptor options)
             .then(hash => {
                 artifactHash = hash;
-                // self.core.setAttribute(activeNode, 'graphDescriptorHash', hash);
                 self.core.setAttribute(activeNode, 'graphDescriptorFileHash', descriptorFileHash);
                 return self.save('Exported audio graph descriptor.');
             })
