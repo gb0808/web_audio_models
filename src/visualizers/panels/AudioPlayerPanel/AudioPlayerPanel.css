@@ -1,5 +1,6 @@
 .audio-player-panel {
     padding: 10px;
+    background: #bad0ec;
 }
 
 .audio-player-panel .controls {
@@ -21,4 +22,31 @@
 .audio-player-panel .status {
     font-size: 12px;
     color: #555;
+}
+
+.audio-player-panel .code-section {
+    margin-top: 12px;
+    border: 1px solid #e0e0e0;
+    background: #f8f8f8;
+}
+
+.audio-player-panel .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 12px;
+    color: #444;
+    background: #f1f1f1;
+}
+
+.audio-player-panel .code-block {
+    margin: 0;
+    padding: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    font-family: Menlo, Consolas, monospace;
+    white-space: pre-wrap;
+    overflow-x: auto;
 }
