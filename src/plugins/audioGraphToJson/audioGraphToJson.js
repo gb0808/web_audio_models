@@ -107,10 +107,20 @@ define([
             });
         }
 
+        function convertToWebAudioCode(json) {
+            const connections = json['connections'].map(c => {
+                const src = json['nodes'][c.src]['name'];
+                const dst = json['nodes'][c.dst]['name'];
+                return { src: src, dst: dst }
+            });
+            console.log(connections);
+        }
+
 
         generateGraph(activeNode)
             // Creates json descriptor of the audio graph to be used by AudioPlayer visualizer
             .then(descriptor => {
+                convertToWebAudioCode(descriptor);
                 var artifact = blobClient.createArtifact('audio-graph');
                 return artifact.addFile('graph.json', JSON.stringify(descriptor, null, 2))
                     .then(fileHash => {

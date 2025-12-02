@@ -71,8 +71,7 @@ define([
                 return self.blobClient.getObjectAsString(moFileHash);
             })
             .then((moFileContent) => {
-                //const audioGraph = JSON.parse(moFileContent);
-                logger.info(moFileContent);
+                //logger.info(moFileContent);
             })
             .catch((err) => {
                 // Result success is false at invocation.
