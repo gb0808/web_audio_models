@@ -179,7 +179,6 @@ define([
         }
     };
 
-    // TODO Add missing audio node types
     // Build Web Audio graph from descriptor or fallback.
     AudioPlayerPanel.prototype.buildGraph = function (audioUrl) {
         var descriptor = this.currentDescriptor;
@@ -215,7 +214,7 @@ define([
             var type = node.type;
             var attrs = node.attrs || {};
 
-            // TODO Add in missing audio node types <-------------------------------
+            console.log(type);
 
             if (type === 'AudioDestinationNode') {
                 self.audioNodes[path] = self.analyser;
@@ -233,6 +232,45 @@ define([
                 if (attrs.oversample && ['none', '2x', '4x'].indexOf(attrs.oversample) !== -1) {
                     self.audioNodes[path].oversample = attrs.oversample;
                 }
+            } else if (type === 'DelayNode') {
+                var delayNode = self.audioCtx.createDelay(1.0) // max delay time in sec
+                if (attrs.delayTime !== undefined) {
+                    delayNode.delayTime.value = attrs.delayTime;
+                }
+                self.audioNodes[path] = delayNode;
+            } else if (type === 'BiquadFilterNode') {
+                var biquadFilterNode = self.audioCtx.createBiquadFilter();
+                if (attrs.type !== undefined) {
+                    biquadFilterNode.type = attrs.type;
+                }
+                if (attrs.Q !== undefined) {
+                    biquadFilterNode.Q.value = attrs.Q;
+                } 
+                if (attrs.frequency !== undefined) {
+                    biquadFilterNode.frequency.value = attrs.frequency;
+                }
+                if (attrs.gain !== undefined) {
+                    biquadFilterNode.gain.value = attrs.gain;
+                }
+                self.audioNodes[path] = biquadFilterNode;
+            } else if (type === 'StereoPannerNode') {
+                var stereoPannerNode = self.audioCtx.createStereoPanner();
+                if (attrs.pan !== undefined) {
+                    stereoPannerNode.pan.value = attrs.pan;
+                }
+                self.audioNodes[path] = stereoPannerNode;
+            } else if (type === 'OscillatorNode') {
+                var oscillatorNode = self.audioCtx.createOscillator();
+                if (attrs.type !== undefined) {
+                    oscillatorNode.type = attrs.type;
+                }
+                if (attrs.frequency !== undefined) {
+                    oscillatorNode.frequency.value = attrs.frequency;
+                }
+                if (attrs.detune !== undefined) {
+                    oscillatorNode.detune.value = attrs.detune;
+                }
+                self.audioNode[path] = oscillatorNode;
             }
         });
 

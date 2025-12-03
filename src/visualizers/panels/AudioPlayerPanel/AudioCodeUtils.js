@@ -77,6 +77,56 @@ define([], function () {
                 }
                 return;
             }
+
+            // TODO add missing nodes
+
+            if (type === 'DelayNode') {
+                lines.push('const ' + name + ' = audioCtx.createDelayNode(1.0); // Delay node with max delay');
+                if (attrs.delayTime !== undefined) {
+                    lines.push(name + '.delayTime.value = ' + JSON.stringify(attrs.delayTime) + ';')
+                }
+                return;
+            }
+
+            if (type === 'BiquadFilterNode') {
+                lines.push('const ' + name + ' = audioCtx.createBiquadFilter(); // BiquadFilter');
+                if (attrs.type !== undefined) {
+                    lines.push(name + '.type = ' + JSON.stringify(attrs.type) + ';');
+                }
+                if (attrs.Q !== undefined) {
+                    lines.push(name + '.Q.value = ' + JSON.stringify(attrs.Q) + ';');
+                } 
+                if (attrs.frequency !== undefined) {
+                    lines.push(name + '.frequency.value = ' + JSON.stringify(attrs.frequency) + ';');
+                }
+                if (attrs.gain !== undefined) {
+                    lines.push(name + '.gain.value = ' + JSON.stringify(attrs.gain) + ';');
+                }
+                return;
+            }
+
+            if (type === 'StereoPannerNode') {
+                lines.push('const ' + name + ' = audioCtx.createStereoPanner(); // StereoPanner');
+                if (attrs.pan !== undefined) {
+                    lines.push(name + '.pan.valye = ' + JSON.stringify(attrs.pan));
+                }
+                return;
+            }
+
+            if (type === 'OscillatorNode') {
+                lines.push('const ' + name + ' = audioCtx.createOscillator(); // Oscillator');
+                if (attrs.type !== undefined) {
+                    lines.push(name + '.type = ' + JSON.stringify(attrs.type) + ';');
+                }
+                if (attrs.frequency !== undefined) {
+                    lines.push(name + '.frequency.value = ' + JSON.stringify(attrs.frequency) + ';');
+                }
+                if (attrs.detune !== undefined) {
+                    lines.push(name + '.detune.value = ' + JSON.stringify(attrs.detune) + ';');
+                }
+                lines.push(name + '.start(audioCtx.currentTime);');
+                return;
+            }
         });
 
         lines.push('');
