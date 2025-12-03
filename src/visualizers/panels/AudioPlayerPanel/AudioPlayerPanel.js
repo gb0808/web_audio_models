@@ -129,26 +129,38 @@ define([
         selector.append('<option value="">Select an AudioGraph descriptor</option>');
 
         var client = this._client;
-        var activeNodeId = this._activeNodeId;
+        var activeNodeId = this._activeNodeId || WebGMEGlobal.State.getActiveObject();
         this._activeNodeId = activeNodeId;
+        if (!client || !activeNodeId) {
+            this.status('Active node not found');
+            return;
+        }
         var activeNode = client.getNode(activeNodeId);
+        if (!activeNode || !activeNode.getChildrenIds) {
+            this.status('Active node not found');
+            return;
+        }
 
         // Walk only AudioGraph children and add hashes to dropdown
         var childIds = activeNode.getChildrenIds();
-        childIds.forEach(childId => {
+        childIds.forEach(function (childId) {
             var child = client.getNode(childId);
+            if (!child) {
+                return;
+            }
             var metaNode = client.getNode(child.getMetaTypeId());
-            var metaName = metaNode.getAttribute('name');
+            var metaName = metaNode && metaNode.getAttribute && metaNode.getAttribute('name');
 
             if (metaName === 'AudioGraph') {
                 var hash = child.getAttribute('graphDescriptorFileHash');
                 if (hash) {
-                    var name = child.getAttribute('name');
+                    var name = child.getAttribute('name') || childId;
                     selector.append('<option value="' + hash + '">' + name + '</option>');
                 }
             }
         });
     };
+
 
     // Handle descriptor once fetched.
     AudioPlayerPanel.prototype.onDescriptorLoaded = function (descriptor) {
