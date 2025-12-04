@@ -14,6 +14,7 @@ define([
 ) {
     'use strict';
 
+    
     var AudioPlayerPanel;
 
     // Panel header setup
@@ -27,11 +28,9 @@ define([
 
         params = params || {};
         this._client = params.client;
-        this._activeNodeId = (typeof WebGMEGlobal !== 'undefined' && WebGMEGlobal.State && WebGMEGlobal.State.getActiveObject())
-            || params.activeNode
-            || null;
+        this._activeNodeId = params.activeNode;
 
-        this.bc = new BlobClient({logger: this.logger});
+        this.bc = new BlobClient({ logger: this.logger });
         this.currentDescriptor = null;
         this.raf = null;
         this.audioCtx = null;
@@ -53,8 +52,9 @@ define([
     AudioPlayerPanel.prototype.initialize = function () {
         var self = this;
         var body = this.$el;
-        body.addClass('audio-player-panel');
 
+        // Setup panel HTML
+        body.addClass('audio-player-panel');
         body.append([
             '<div class="controls">',
             '  <input type="file" class="audio-input" accept="audio/*" />',
@@ -78,12 +78,14 @@ define([
             '</div>'
         ].join(''));
 
+        // UI element references
         this.canvas = body.find('.waveform')[0];
         this.ctx2d = this.canvas.getContext('2d');
         this.statusEl = body.find('.status');
         this.codeContentEl = body.find('.code-content')[0];
         this.status('Select an AudioGraph descriptor or pick a local audio file to begin.');
 
+        // Event bindings
         this.$el.on('click', '.btn-play', function () {
             self.play();
         });
@@ -95,7 +97,6 @@ define([
             if (!hash) {
                 return;
             }
-            self.status('Loading descriptor ' + hash + ' ...');
             self.bc.getObjectAsJSON(hash)
                 .then(function (descriptor) {
                     self.onDescriptorLoaded(descriptor, 'Descriptor loaded');
@@ -119,14 +120,6 @@ define([
             self.copyCode();
         });
         this.populateDescriptorDropdown();
-
-        if (typeof WebGMEGlobal !== 'undefined' && WebGMEGlobal.State && WebGMEGlobal.State.on) {
-            var selfPanel = this;
-            WebGMEGlobal.State.on('change:activeObject', function (_m, nodeId) {
-                selfPanel._activeNodeId = nodeId;
-                selfPanel.populateDescriptorDropdown();
-            });
-        }
     };
 
     // Walks the AudioStudio and pulls all AudioGraph descriptors hashes for dropdown
@@ -136,43 +129,49 @@ define([
         selector.append('<option value="">Select an AudioGraph descriptor</option>');
 
         var client = this._client;
-        var activeNodeId = this._activeNodeId || (typeof WebGMEGlobal !== 'undefined' && WebGMEGlobal.State && WebGMEGlobal.State.getActiveObject());
+        var activeNodeId = this._activeNodeId || WebGMEGlobal.State.getActiveObject();
         this._activeNodeId = activeNodeId;
-        var activeNode = client && activeNodeId && client.getNode(activeNodeId);
+        if (!client || !activeNodeId) {
+            this.status('Active node not found');
+            return;
+        }
+        var activeNode = client.getNode(activeNodeId);
+        if (!activeNode || !activeNode.getChildrenIds) {
+            this.status('Active node not found');
+            return;
+        }
 
         // Walk only AudioGraph children and add hashes to dropdown
-        var childIds = activeNode.getChildrenIds() || [];
+        var childIds = activeNode.getChildrenIds();
         childIds.forEach(function (childId) {
             var child = client.getNode(childId);
-            var metaNode = child && client.getNode(child.getMetaTypeId && child.getMetaTypeId());
+            if (!child) {
+                return;
+            }
+            var metaNode = client.getNode(child.getMetaTypeId());
             var metaName = metaNode && metaNode.getAttribute && metaNode.getAttribute('name');
 
             if (metaName === 'AudioGraph') {
                 var hash = child.getAttribute('graphDescriptorFileHash');
-
                 if (hash) {
                     var name = child.getAttribute('name') || childId;
                     selector.append('<option value="' + hash + '">' + name + '</option>');
                 }
             }
         });
-
-        var optionCount = selector.find('option').length - 1; // ignore placeholder
-        this.status(optionCount ? ('Found ' + optionCount + ' AudioGraph descriptors') : 'No AudioGraph descriptors found');
     };
+
 
     // Handle descriptor once fetched.
     AudioPlayerPanel.prototype.onDescriptorLoaded = function (descriptor) {
         this.currentDescriptor = descriptor;
         this.status('Descriptor loaded');
         var self = this;
-        var resolvedAudioHash = descriptor.audioHash;
         var urlToUse = this.localFileUrl;
 
-        if (!urlToUse && resolvedAudioHash) {
-            urlToUse = this.bc.getDownloadURL(resolvedAudioHash);
-        }
+        // Generates boilerplate code for audio graph
         this.renderGraphCode(descriptor, urlToUse);
+
         if (urlToUse) {
             self.buildGraph(urlToUse);
         } else {
@@ -180,11 +179,9 @@ define([
         }
     };
 
-    // TODO Add missing audio node types
     // Build Web Audio graph from descriptor or fallback.
     AudioPlayerPanel.prototype.buildGraph = function (audioUrl) {
         var descriptor = this.currentDescriptor;
-        this.renderGraphCode(descriptor, audioUrl);
 
         if (!audioUrl) {
             this.status('No audio source loaded.');
@@ -192,7 +189,7 @@ define([
         }
 
         var self = this;
-        this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        this.audioCtx = new window.AudioContext();
         this.audioAsset = new Audio();
         this.audioAsset.src = audioUrl;
         this.mediaSource = this.audioCtx.createMediaElementSource(this.audioAsset);
@@ -209,15 +206,15 @@ define([
             return;
         }
 
-        var descriptorNodes = descriptor.nodes || {};
+        var descriptorNodes = descriptor.nodes;
 
         // Walk through descriptor and create Web Audio nodes
-        Object.keys(descriptorNodes).forEach(function (path) {
+        Object.keys(descriptorNodes).forEach(path => {
             var node = descriptorNodes[path];
             var type = node.type;
             var attrs = node.attrs || {};
 
-            // TODO Add in missing audio node types <-------------------------------
+            console.log(type);
 
             if (type === 'AudioDestinationNode') {
                 self.audioNodes[path] = self.analyser;
@@ -235,11 +232,50 @@ define([
                 if (attrs.oversample && ['none', '2x', '4x'].indexOf(attrs.oversample) !== -1) {
                     self.audioNodes[path].oversample = attrs.oversample;
                 }
+            } else if (type === 'DelayNode') {
+                var delayNode = self.audioCtx.createDelay(1.0) // max delay time in sec
+                if (attrs.delayTime !== undefined) {
+                    delayNode.delayTime.value = attrs.delayTime;
+                }
+                self.audioNodes[path] = delayNode;
+            } else if (type === 'BiquadFilterNode') {
+                var biquadFilterNode = self.audioCtx.createBiquadFilter();
+                if (attrs.type !== undefined) {
+                    biquadFilterNode.type = attrs.type;
+                }
+                if (attrs.Q !== undefined) {
+                    biquadFilterNode.Q.value = attrs.Q;
+                } 
+                if (attrs.frequency !== undefined) {
+                    biquadFilterNode.frequency.value = attrs.frequency;
+                }
+                if (attrs.gain !== undefined) {
+                    biquadFilterNode.gain.value = attrs.gain;
+                }
+                self.audioNodes[path] = biquadFilterNode;
+            } else if (type === 'StereoPannerNode') {
+                var stereoPannerNode = self.audioCtx.createStereoPanner();
+                if (attrs.pan !== undefined) {
+                    stereoPannerNode.pan.value = attrs.pan;
+                }
+                self.audioNodes[path] = stereoPannerNode;
+            } else if (type === 'OscillatorNode') {
+                var oscillatorNode = self.audioCtx.createOscillator();
+                if (attrs.type !== undefined) {
+                    oscillatorNode.type = attrs.type;
+                }
+                if (attrs.frequency !== undefined) {
+                    oscillatorNode.frequency.value = attrs.frequency;
+                }
+                if (attrs.detune !== undefined) {
+                    oscillatorNode.detune.value = attrs.detune;
+                }
+                self.audioNode[path] = oscillatorNode;
             }
         });
 
         // Connect graph using descriptor connections
-        (descriptor.connections || []).forEach(function (c) {
+        (descriptor.connections).forEach(c => {
             var srcNode = self.audioNodes[c.src] || self.mediaSource;
             var dstNode = self.audioNodes[c.dst] || self.analyser;
             srcNode.connect(dstNode);
@@ -262,8 +298,8 @@ define([
     AudioPlayerPanel.prototype.drawWaveform = function () {
         var self = this;
         var buffer = new Uint8Array(2048);
-        var width = this.logicalWidth || this.canvas.width;
-        var height = this.logicalHeight || this.canvas.height;
+        var width = this.canvas.width;
+        var height = this.canvas.height;
 
         function draw() {
             self.raf = window.requestAnimationFrame(draw);
