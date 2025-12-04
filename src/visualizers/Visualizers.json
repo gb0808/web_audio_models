@@ -1,7 +1,7 @@
 [
   {
     "id": "AudioPlayerPanel",
-    "title": "Audio Player",
+    "title": "Web Audio Player",
     "panel": "panels/AudioPlayerPanel/AudioPlayerPanel"
   }
 ]

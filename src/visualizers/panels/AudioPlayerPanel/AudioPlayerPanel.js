@@ -23,7 +23,7 @@ define([
         options[PanelBaseWithHeader.OPTIONS.LOGGER_INSTANCE_NAME] = 'AudioPlayerPanel';
         options[PanelBaseWithHeader.OPTIONS.FLOATING_TITLE] = true;
 
-        PanelBaseWithHeader.apply(this, [options, 'Audio Player']);
+        PanelBaseWithHeader.apply(this, [options, 'Web Audio Player']);
         IActivePanel.call(this, layoutManager, params);
 
         params = params || {};
