@@ -214,8 +214,6 @@ define([
             var type = node.type;
             var attrs = node.attrs || {};
 
-            console.log(type);
-
             if (type === 'AudioDestinationNode') {
                 self.audioNodes[path] = self.analyser;
             } else if (type === 'MediaElementSourceNode') {
@@ -233,7 +231,7 @@ define([
                     self.audioNodes[path].oversample = attrs.oversample;
                 }
             } else if (type === 'DelayNode') {
-                var delayNode = self.audioCtx.createDelay(1.0) // max delay time in sec
+                var delayNode = self.audioCtx.createDelay(10.0) // max delay time in sec
                 if (attrs.delayTime !== undefined) {
                     delayNode.delayTime.value = attrs.delayTime;
                 }
@@ -270,7 +268,7 @@ define([
                 if (attrs.detune !== undefined) {
                     oscillatorNode.detune.value = attrs.detune;
                 }
-                self.audioNode[path] = oscillatorNode;
+                self.audioNodes[path] = oscillatorNode;
             }
         });
 
@@ -278,7 +276,19 @@ define([
         (descriptor.connections).forEach(c => {
             var srcNode = self.audioNodes[c.src] || self.mediaSource;
             var dstNode = self.audioNodes[c.dst] || self.analyser;
-            srcNode.connect(dstNode);
+            
+            if (srcNode instanceof OscillatorNode) {
+                if (dstNode instanceof GainNode) {
+                    srcNode.connect(dstNode.gain);
+                } else if (dstNode instanceof StereoPannerNode) {
+                    srcNode.connect(dstNode.pan);
+                } else if (dstNode instanceof BiquadFilterNode) {
+                    srcNode.connect(dstNode.frequency);
+                }
+                srcNode.start();
+            } else {
+                srcNode.connect(dstNode);
+            }
         });
 
         this.analyser.connect(this.audioCtx.destination);

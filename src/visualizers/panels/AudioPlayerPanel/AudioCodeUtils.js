@@ -78,8 +78,6 @@ define([], function () {
                 return;
             }
 
-            // TODO add missing nodes
-
             if (type === 'DelayNode') {
                 lines.push('const ' + name + ' = audioCtx.createDelayNode(1.0); // Delay node with max delay');
                 if (attrs.delayTime !== undefined) {
@@ -124,7 +122,6 @@ define([], function () {
                 if (attrs.detune !== undefined) {
                     lines.push(name + '.detune.value = ' + JSON.stringify(attrs.detune) + ';');
                 }
-                lines.push(name + '.start(audioCtx.currentTime);');
                 return;
             }
         });
@@ -134,11 +131,21 @@ define([], function () {
         connections.forEach(function (conn) {
             var srcRef = nameMap[conn.src] || 'mediaSource';
             var dstRef = nameMap[conn.dst] || 'analyser';
-            lines.push('connect(' + srcRef + ', ' + dstRef + ');');
+            if (nodes[conn.src].type === 'OscillatorNode') {
+                if (nodes[conn.dst].type === 'GainNode') {
+                    lines.push('connect(' + srcRef + ', ' + dstRef + '.gain);');
+                } else if (nodes[conn.dst].type === 'StereoPannerNode') {
+                    lines.push('connect(' + srcRef + ', ' + dstRef + '.pan);');
+                } else if (nodes[conn.dst].type === 'BiquadFilterNode') {
+                    lines.push('connect(' + srcRef + ', ' + dstRef + '.frequency);');
+                }
+                lines.push(srcRef + '.start();');
+            } else {
+                lines.push('connect(' + srcRef + ', ' + dstRef + ');');
+            }
         });
         lines.push('connect(analyser, audioCtx.destination);');
         lines.push('audioElement.play();');
-
         return lines.join('\n');
     }
 
